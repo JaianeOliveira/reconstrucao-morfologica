@@ -1,79 +1,84 @@
 import cv2
 import numpy as np
+from scipy.ndimage import distance_transform_edt, label
 
-def eliminate_small_objects(img_bin, min_size):
-    """
-    Remove componentes conectados com área menor que min_size.
-    img_bin: imagem binária (0 ou 255)
-    min_size: área mínima em pixels para manter o objeto
-    """
-    # encontra componentes conectados
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(img_bin, connectivity=8)
-    output = np.zeros_like(img_bin)
-    # percorre cada componente (label 1..N)
-    for label in range(1, num_labels):
-        area = stats[label, cv2.CC_STAT_AREA]
-        if area >= min_size:
-            output[labels == label] = 255
+# 1. Carregar imagem em binário
+def preprocess_image(path, threshold=127):
+    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    _, binary = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY)
+    return (binary > 0).astype(np.uint8) * 255, img  # binária, original
+
+# 2. Remover pequenos objetos
+def remove_small_objects_numpy(binary, min_size=150):
+    labeled, num = label(binary)
+    output = np.zeros_like(binary)
+    for i in range(1, num + 1):
+        if np.sum(labeled == i) >= min_size:
+            output[labeled == i] = 255
     return output
 
-def fill_holes(img_bin):
-    """
-    Preenche buracos (background interno) nos objetos.
-    img_bin: imagem binária (0 ou 255)
-    """
-    # inverte para que buracos virem objetos
-    inv = cv2.bitwise_not(img_bin)
-    # flood fill do fundo
+# 3. Preencher buracos
+def fill_holes_numpy(binary):
+    inv = 255 - binary
     h, w = inv.shape
-    mask = np.zeros((h+2, w+2), np.uint8)
-    cv2.floodFill(inv, mask, (0,0), 255)
-    # inverte floodfilled e combina com original
-    inv_flood = cv2.bitwise_not(inv)
-    filled = cv2.bitwise_or(img_bin, inv_flood)
-    return filled
+    mask = np.zeros((h + 2, w + 2), np.uint8)
+    filled = inv.copy()
+    cv2.floodFill(filled, mask, (0, 0), 128)
+    holes = (filled == 0).astype(np.uint8) * 255
+    return cv2.bitwise_or(binary, holes)
 
-def separate_connected_objects(img_bin):
-    """
-    Separa objetos conectados usando distância e watershed.
-    img_bin: imagem binária (0 ou 255)
-    """
-    # distância ao fundo
-    dist = cv2.distanceTransform(img_bin, cv2.DIST_L2, 5)
-    # normaliza e limiariza para detectar "seeds"
-    _, sure_fg = cv2.threshold(dist, 0.5*dist.max(), 255, 0)
+# 4. Separar objetos conectados com watershed
+def watershed_numpy(binary):
+    dist = distance_transform_edt(binary)
+    dist = cv2.normalize(dist, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    _, sure_fg = cv2.threshold(dist, 0.6 * dist.max(), 255, 0)
     sure_fg = np.uint8(sure_fg)
-    # região incerta
-    sure_bg = cv2.dilate(img_bin, np.ones((3,3), np.uint8), iterations=3)
-    unknown = cv2.subtract(sure_bg, sure_fg)
-    # marcadores
-    num_markers, markers = cv2.connectedComponents(sure_fg)
-    markers = markers + 1  # para que o fundo seja 1, objetos comece em 2
-    markers[unknown==255] = 0
-    # watershed precisa de BGR
-    img_color = cv2.cvtColor(img_bin, cv2.COLOR_GRAY2BGR)
-    cv2.watershed(img_color, markers)
-    # pixels marcados por watershed (bordas) viram 0
-    separated = np.zeros_like(img_bin)
-    separated[markers > 1] = 255
-    return separated
+    unknown = cv2.subtract(binary, sure_fg)
 
+    # Marcadores
+    markers, _ = label(sure_fg)
+    markers = markers + 1
+    markers[unknown == 255] = 0
+
+    # Aplicar watershed
+    color = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
+    markers = markers.astype(np.int32)
+    cv2.watershed(color, markers)
+
+    # Colorir regiões
+    output = np.zeros_like(color)
+    max_label = markers.max()
+    for i in range(2, max_label + 1):
+        mask = markers == i
+        color_val = np.random.randint(0, 255, size=3)
+        output[mask] = color_val
+    return output
+
+# 5. Salvar resultados
+def salvar_imagens(caminho, tipo):
+    arquivo = caminho.split('/')[1]
+    nome = arquivo.split('.')[0]
+    binaria, original = preprocess_image(caminho)
+
+    limpos = remove_small_objects_numpy(binaria, min_size=150)
+    preenchido = fill_holes_numpy(limpos)
+    separados = watershed_numpy(preenchido)
+
+    match tipo:
+        case "limpos":
+            cv2.imwrite(f"results/{nome}_objetos_limpos.png", limpos)
+        case "preenchido":
+            cv2.imwrite(f"results/{nome}_buracos_preeenchidos.png", preenchido)
+        case "separados":
+            cv2.imwrite(f"results/{nome}_objetos_separados.png", separados)
+
+# 6. Executar
 if __name__ == "__main__":
-    # exemplo de uso
-    img = cv2.imread("assets/teste.png", cv2.IMREAD_GRAYSCALE)
-    # binariza
-    _, img_bin = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+    caminho_limpos = "assets/space.png"
+    caminho_preenchido = "assets/space.png"
+    caminho_separados = "assets/space.png"
 
-    # 1) Elimina pequenos objetos (<500 pixels)
-    no_small = eliminate_small_objects(img_bin, min_size=500)
-    cv2.imwrite("assets/sem_pequenos.png", no_small)
+    salvar_imagens(caminho_limpos, "limpos")
+    salvar_imagens(caminho_limpos, "preenchido")
+    salvar_imagens(caminho_limpos, "sepados
 
-    # 2) Preenche buracos em objetos
-    filled = fill_holes(img_bin)
-    cv2.imwrite("assets/buracos_preenchidos.png", filled)
-
-    # 3) Separa objetos conectados
-    separated = separate_connected_objects(img_bin)
-    cv2.imwrite("assets/separados.png", separated)
-
-    print("Processamento concluído!")
