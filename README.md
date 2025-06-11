@@ -57,8 +57,8 @@ até que `H_{k+1} = H_k`, onde `B` é o elemento estruturante (aqui, 3×3). O re
 - Marca manualmente um pixel em cada círculo e aplica reconstrução para separar as regiões.
 - **Input**: `outputs/ex2_original.png`  
   ![ex2_original](outputs/ex2_original.png)
-- **Output**: `outputs/ex2_separated.png`  
-  ![ex2_separated](outputs/ex2_separated.png)
+- **Output**: `outputs/ex2_result.png`  
+  ![ex2_result](outputs/ex2_result.png)
 
 ## 5. Instruções de Execução
 
