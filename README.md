@@ -1,103 +1,44 @@
 # Reconstrução Morfológica em Níveis de Cinza
 
-## 1. Introdução
+### Visão Geral
+Neste projeto, colocamos a mão na massa para mostrar como funciona a **reconstrução morfológica** em imagens de tons de cinza. Tudo foi feito com Python puro: NumPy para mexer nos pixels e Pillow para salvar as figuras.
 
-Este trabalho explora a **reconstrução morfológica** em imagens de níveis de cinza, implementada manualmente em Python usando apenas NumPy e Pillow, sem funções prontas de OpenCV ou scikit-image. O objetivo é demonstrar:
+### Por que morfologia?
+Morfologia é o que usamos para tratar a forma dos objetos numa imagem. Aqui, focamos em dois desafios comuns:
 
-- Conceitos teóricos de morfologia matemática em níveis de cinza.
-- Operações de dilatação e erosão condicionais (geodésicas).
-- Algoritmo de reconstrução por dilatação geodésica.
-- Exemplos práticos de:
-  1. Eliminação de pequenos objetos.
-  2. Separação de objetos conectados.
+1. **Remover ruído**: eliminamos pontinhos isolados, mas mantemos as estruturas principais intactas.
+2. **Preencher buracos**: lacunas internas dos objetos são fechadas, deixando-os sólidos.
 
-## 2. Conceitos Teóricos
+### Como funciona
+1. **Marcador e máscara**: você aponta onde quer agir (marcador) e define até onde a ação vale (máscara).
+2. **Operador geodésico**: aplicamos erosão ou dilatação e, em seguida, consertamos os resultados para não ultrapassar a máscara.
+3. **Iteração**: repetimos até não mudar nada e pronto, temos o resultado final.
 
-### 2.1 Reconstrução Morfológica
+### Estrutura do código
+- **main.py**: script único que gera as imagens de teste, aplica os métodos e salva tudo em `outputs/`.
+- **Funções**:
+  - `dilate()`, `erode()`: dilatação e erosão manuais.
+  - `morphological_reconstruction()`: dilatação geodésica iterativa.
+  - `remove_small_objects()`, `fill_holes()`: casos de uso.
 
-A reconstrução morfológica envolve duas imagens:
+### Exemplos
+| Caso                  | Antes                                    | Depois                                   |
+|-----------------------|------------------------------------------|------------------------------------------|
+| Remoção de ruído      | ![ex1_original](outputs/ex1_original.png) | ![ex1_result](outputs/ex1_result.png)   |
+| Preenchimento de buracos | ![ex2_original](outputs/ex2_original.png) | ![ex2_result](outputs/ex2_result.png)   |
 
-- **Marcador**: imagem inicial com sementes ou regiões de interesse.
-- **Máscara**: imagem que limita a propagação do marcador.
-
-O processo itera uma operação de **dilatação geodésica**:
-
-```none
-H_{k+1} = (H_k ⊕ B) ∩ Mask
-```
-
-até que `H_{k+1} = H_k`, onde `B` é o elemento estruturante (aqui, 3×3). O resultado preserva as formas da máscara guiadas pelas sementes do marcador.
-
-### 2.2 Dilatação e Erosão Condicionais
-
-- **Dilatação Condicional**: dilata o marcador e, em seguida, faz mínimo ponto a ponto com a máscara, restringindo a expansão.
-- **Erosão Condicional**: erosiona o marcador e faz máximo ponto a ponto com a máscara, impedindo redução além de certos limites.
-
-## 3. Estrutura do Código
-
-- **main.py**: script único com:
-  - Implementações manuais de `dilate()`, `erode()`, `geodesic_dilation()` e `morphological_reconstruction()`.
-  - Geração de imagens sintéticas para os dois casos.
-  - Rotinas de processamento e salvamento de resultados.
-
-## 4. Exemplos Práticos
-
-### 4.1 Eliminação de Pequenos Objetos
-
-- Gera uma imagem com dois blocos grandes e pontos isolados (ruídos).
-- Aplica **abertura por reconstrução** (erosão seguida de reconstrução).
-- **Input**: `outputs/ex1_original.png`  
-  ![ex1_original](outputs/ex1_original.png)
-- **Output**: `outputs/ex1_result.png`  
-  ![ex1_result](outputs/ex1_result.png)
-
-### 4.2 Separação de Objetos Conectados
-
-- Gera dois círculos sobrepostos.
-- Marca manualmente um pixel em cada círculo e aplica reconstrução para separar as regiões.
-- **Input**: `outputs/ex2_original.png`  
-  ![ex2_original](outputs/ex2_original.png)
-- **Output**: `outputs/ex2_result.png`  
-  ![ex2_result](outputs/ex2_result.png)
-
-## 5. Instruções de Execução
-
-1. **Pré-requisitos**:
-
-   - Python 3.x
-   - NumPy
-   - Pillow
-
+### Como usar
+1. Instale as dependências:
    ```bash
    pip install numpy pillow
    ```
-
-2. **Executar**:
-
+2. Rode o script:
    ```bash
    python main.py
    ```
+3. Confira os resultad
+**Equipe**os em `outputs/`.
 
-3. **Saída**:
-   - `outputs/ex1_original.png`, `outputs/ex1_result.png`
-   - `outputs/ex2_original.png`, `outputs/ex2_result.png`
-
-## 6. Vantagens e Limitações
-
-- **Vantagens**:
-
-  - Implementação didática, sem dependências externas de visão computacional.
-  - Controle total sobre cada etapa morfológica.
-  - Preservação exata de estruturas definidas pela máscara.
-
-- **Limitações**:
-  - Looping puro em Python: performance limitada para imagens maiores.
-  - Marcadores manuais em separação: não há detecção automática de sementes.
-
-## 7. Conclusão
-
-Este trabalho demonstrou, na prática, como a reconstrução morfológica em níveis de cinza pode ser implementada “na unha”, reforçando a compreensão dos operadores condicionais e sua aplicação em casos típicos de remoção de ruído e segmentação de regiões conectadas.
-
-## Equipe
+---
 - Alex Sandro Antonio de Oliveira (22112015)
 - Jaiane Souza Oliveira (22112369)
