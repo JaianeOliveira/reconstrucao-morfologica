@@ -36,9 +36,9 @@ Morfologia é o que usamos para tratar a forma dos objetos numa imagem. Aqui, fo
    ```bash
    python main.py
    ```
-3. Confira os resultad
-**Equipe**os em `outputs/`.
+3. Confira os resultados em `outputs/`.
 
 ---
+**Equipe**
 - Alex Sandro Antonio de Oliveira (22112015)
 - Jaiane Souza Oliveira (22112369)
