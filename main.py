@@ -1,89 +1,129 @@
 import os
 import numpy as np
-from skimage import morphology, util, draw, segmentation, measure
-from skimage.morphology import erosion, reconstruction, disk
-from skimage.io import imsave
-from scipy import ndimage as ndi
-from skimage.color import label2rgb
+from PIL import Image
 
-# Cria pasta de saída
-output_dir = 'output'
-os.makedirs(output_dir, exist_ok=True)
 
-# Funções de processamento
-def eliminate_small_objects_reconstruction(image, selem, min_size):
-    marker = erosion(image, selem)
-    rec = reconstruction(marker, image, method='dilation')
-    binary = rec > rec.mean()
-    cleaned = morphology.remove_small_objects(binary, min_size)
-    return cleaned
+def dilate(image: np.ndarray, struct: np.ndarray) -> np.ndarray:
+    """
+    Dilatação manual de uma imagem em níveis de cinza.
+    """
+    h, w = image.shape
+    sh, sw = struct.shape
+    pad_h, pad_w = sh // 2, sw // 2
+    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
+    result = np.zeros_like(image)
+    offsets = [(i - pad_h, j - pad_w) for i in range(sh) for j in range(sw) if struct[i, j]]
+    for i in range(h):
+        for j in range(w):
+            vals = [padded[i + pad_h + di, j + pad_w + dj] for di, dj in offsets]
+            result[i, j] = max(vals)
+    return result
 
-def fill_holes_reconstruction(image):
-    inv = util.invert(image)
-    marker = np.copy(inv)
-    marker[1:-1, 1:-1] = inv.max()
-    rec = reconstruction(marker, inv, method='erosion')
-    filled = util.invert(rec)
-    return filled
 
-def separate_objects_watershed(image):
-    binary = image > image.mean()
-    distance = ndi.distance_transform_edt(binary)
-    local_maxi = morphology.local_maxima(distance)
-    markers = measure.label(local_maxi)
-    labels = segmentation.watershed(-distance, markers, mask=binary)
-    return labels
+def erode(image: np.ndarray, struct: np.ndarray) -> np.ndarray:
+    """
+    Erosão manual de uma imagem em níveis de cinza.
+    """
+    h, w = image.shape
+    sh, sw = struct.shape
+    pad_h, pad_w = sh // 2, sw // 2
+    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=255)
+    result = np.zeros_like(image)
+    offsets = [(i - pad_h, j - pad_w) for i in range(sh) for j in range(sw) if struct[i, j]]
+    for i in range(h):
+        for j in range(w):
+            vals = [padded[i + pad_h + di, j + pad_w + dj] for di, dj in offsets]
+            result[i, j] = min(vals)
+    return result
 
-# Geradores de imagens de teste
-def gen_small_objects_image():
-    img = np.zeros((200, 200), dtype=np.uint8)
-    rr, cc = draw.disk((100, 100), 60)
-    img[rr, cc] = 255
-    rng = np.random.RandomState(42)
-    coords = rng.randint(0, 200, (200, 2))
-    img[coords[:,0], coords[:,1]] = 255
+
+def geodesic_dilation(marker: np.ndarray, mask: np.ndarray, struct: np.ndarray) -> np.ndarray:
+    """
+    Dilatação condicional geodésica: dilate(marker) restrita a mask.
+    """
+    dil = dilate(marker, struct)
+    return np.minimum(dil, mask)
+
+
+def morphological_reconstruction(marker: np.ndarray, mask: np.ndarray, struct: np.ndarray) -> np.ndarray:
+    """
+    Reconstrução morfológica por dilatação geodésica até convergência.
+    """
+    prev = marker.copy()
+    while True:
+        curr = geodesic_dilation(prev, mask, struct)
+        if np.array_equal(curr, prev):
+            break
+        prev = curr
+    return curr
+
+
+def synthetic_image_removal(size=(200,200), seed=0):
+    img = np.zeros(size, dtype=np.uint8)
+    img[20:80, 20:80] = 255
+    img[120:180, 120:180] = 255
+    np.random.seed(seed)
+    coords = np.random.randint(0, size[0], (50,2))
+    for y, x in coords:
+        img[y, x] = 255
     return img
 
-def gen_holes_image():
-    img = np.zeros((200, 200), dtype=np.uint8)
-    rr, cc = draw.disk((100, 100), 80)
-    img[rr, cc] = 255
-    rng = np.random.RandomState(24)
-    for center in [(80,80), (120,120), (80,120)]:
-        r = rng.randint(5, 15)
-        rr, cc = draw.disk(center, r)
-        img[rr, cc] = 0
+
+def synthetic_image_hole(size=(200,200), center=(100,100), outer_r=60, inner_r=30):
+    img = np.zeros(size, dtype=np.uint8)
+    yy, xx = np.ogrid[:size[0], :size[1]]
+    mask = (xx-center[0])**2 + (yy-center[1])**2 <= outer_r**2
+    img[mask] = 255
+    hole = (xx-center[0])**2 + (yy-center[1])**2 <= inner_r**2
+    img[hole] = 0
     return img
 
-def gen_touching_objects_image():
-    img = np.zeros((200, 200), dtype=np.uint8)
-    rr, cc = draw.disk((100, 80), 50)
-    img[rr, cc] = 255
-    rr, cc = draw.disk((100, 120), 50)
-    img[rr, cc] = 255
+
+def synthetic_image_separation(size=(200,200), centers=[(70,100),(130,100)], radius=50):
+    img = np.zeros(size, dtype=np.uint8)
+    yy, xx = np.ogrid[:size[0], :size[1]]
+    for y0, x0 in centers:
+        mask = (xx-x0)**2 + (yy-y0)**2 <= radius**2
+        img[mask] = 255
     return img
 
-# Gera e salva originais
-small_img = gen_small_objects_image()
-imsave(os.path.join(output_dir, 'original_small_objects.png'), small_img)
+# ---- Processamento ----
 
-holes_img = gen_holes_image()
-imsave(os.path.join(output_dir, 'original_holes.png'), holes_img)
+def remove_small_objects(img: np.ndarray, struct: np.ndarray) -> np.ndarray:
+    marker = erode(img, struct)
+    return morphological_reconstruction(marker, img, struct)
 
-touch_img = gen_touching_objects_image()
-imsave(os.path.join(output_dir, 'original_touching_objects.png'), touch_img)
 
-# Processa e salva resultados
-cleaned = eliminate_small_objects_reconstruction(small_img, disk(3), min_size=500)
-imsave(os.path.join(output_dir, 'cleaned_objects.png'), (cleaned * 255).astype(np.uint8))
+def fill_holes(img: np.ndarray, struct: np.ndarray) -> np.ndarray:
+    inv = 255 - img
+    marker = np.zeros_like(inv)
+    marker[0, :] = inv[0, :]
+    marker[-1, :] = inv[-1, :]
+    marker[:, 0] = inv[:, 0]
+    marker[:, -1] = inv[:, -1]
+    rec = morphological_reconstruction(marker, inv, struct)
+    return 255 - rec
 
-filled = fill_holes_reconstruction(holes_img)
-imsave(os.path.join(output_dir, 'filled_holes.png'), (filled * 255).astype(np.uint8))
 
-labels = separate_objects_watershed(touch_img)
-colored = (label2rgb(labels, image=touch_img, bg_label=0) * 255).astype(np.uint8)
-imsave(os.path.join(output_dir, 'separated_objects.png'), colored)
 
-print(f"Arquivos salvos em '{output_dir}/':")
-for fname in os.listdir(output_dir):
-    print("- " + fname)
+def main():
+    os.makedirs('outputs', exist_ok=True)
+    struct = np.ones((3,3), dtype=bool)
+
+    # Caso 1: remoção de pequenos objetos
+    img1 = synthetic_image_removal()
+    res1 = remove_small_objects(img1, struct)
+    Image.fromarray(img1).save('outputs/ex1_original.png')
+    Image.fromarray(res1).save('outputs/ex1_result.png')
+
+    # Caso 2: preenchimento de buracos
+    img2 = synthetic_image_hole()
+    res2 = fill_holes(img2, struct)
+    Image.fromarray(img2).save('outputs/ex2_original.png')
+    Image.fromarray(res2).save('outputs/ex2_result.png')
+
+
+    print('Processamento concluído. Imagens salvas em outputs/')
+
+if __name__ == '__main__':
+    main()
