@@ -80,7 +80,7 @@ até que `H_{k+1} = H_k`, onde `B` é o elemento estruturante (aqui, 3×3). O re
 
 3. **Saída**:
    - `outputs/ex1_original.png`, `outputs/ex1_result.png`
-   - `outputs/ex2_original.png`, `outputs/ex2_separated.png`
+   - `outputs/ex2_original.png`, `outputs/ex2_result.png`
 
 ## 6. Vantagens e Limitações
 
@@ -97,3 +97,7 @@ até que `H_{k+1} = H_k`, onde `B` é o elemento estruturante (aqui, 3×3). O re
 ## 7. Conclusão
 
 Este trabalho demonstrou, na prática, como a reconstrução morfológica em níveis de cinza pode ser implementada “na unha”, reforçando a compreensão dos operadores condicionais e sua aplicação em casos típicos de remoção de ruído e segmentação de regiões conectadas.
+
+## Equipe
+- Alex Sandro Antonio de Oliveira (22112015)
+- Jaiane Souza Oliveira (22112369)
