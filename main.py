@@ -79,14 +79,6 @@ def synthetic_image_hole(size=(200,200), center=(100,100), outer_r=60, inner_r=3
     return img
 
 
-def synthetic_image_separation(size=(200,200), centers=[(70,100),(130,100)], radius=50):
-    img = np.zeros(size, dtype=np.uint8)
-    yy, xx = np.ogrid[:size[0], :size[1]]
-    for y0, x0 in centers:
-        mask = (xx-x0)**2 + (yy-y0)**2 <= radius**2
-        img[mask] = 255
-    return img
-
 # ---- Processamento ----
 
 def remove_small_objects(img: np.ndarray, struct: np.ndarray) -> np.ndarray:
